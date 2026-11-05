@@ -1,0 +1,6 @@
+recording,protocol,condition,rate_hz,units,target_ids,notes
+SYN-CAR,car_approach,standard,50.0,2,"[10, 11]",blinks from: DMS blink counter
+SYN-CROSS,crossing,standard,50.0,9,[1],blinks from: DMS blink counter
+SYN-CROSS-DEG,crossing,degraded,50.0,9,[1],blinks from: DMS blink counter
+SYN-TWO,two_pedestrians,standard,50.0,4,"{""L"": [1], ""R"": [2]}",blinks from: DMS blink counter
+SYN-WALK,walkaway,standard,50.0,4,"[1, 11]",blinks from: DMS blink counter

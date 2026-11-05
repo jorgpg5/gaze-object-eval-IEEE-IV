@@ -1,0 +1,13 @@
+{
+  "name": "SYN-CROSS-DEG",
+  "protocol": "crossing",
+  "condition": "degraded",
+  "synthetic": {
+    "yaw_bias_deg": 2.5,
+    "pitch_bias_deg": 1.5,
+    "yaw_noise_deg": 1.2,
+    "pitch_noise_deg": 1.5,
+    "seed": 5,
+    "system": "stand-in: nearest 3D box within 1.5 deg, else nearest camera-only box"
+  }
+}

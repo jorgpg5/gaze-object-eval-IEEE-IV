@@ -1,0 +1,13 @@
+{
+  "name": "SYN-CROSS",
+  "protocol": "crossing",
+  "condition": "standard",
+  "synthetic": {
+    "yaw_bias_deg": -0.6,
+    "pitch_bias_deg": 0.3,
+    "yaw_noise_deg": 0.3,
+    "pitch_noise_deg": 0.5,
+    "seed": 2,
+    "system": "stand-in: nearest 3D box within 1.5 deg, else nearest camera-only box"
+  }
+}
