@@ -1,6 +1,6 @@
 # Gaze-to-object mapping evaluation
 
-goeval 0.1.2. Settings that differ from the defaults: none.
+goeval 0.1.3. Settings that differ from the defaults: none.
 
 ## Recordings
 
@@ -160,13 +160,13 @@ Time inside the units that is not scored:
 3D-first cone (3D candidates first, camera-only only if no 3D box is within the tolerance):
 
 
-| recording | system | cone | cone_3d_first | competitor_s | system_with_competitor | cone_with_competitor | cone_3d_first_with_competitor |
-|---|---|---|---|---|---|---|---|
-| SYN-CAR | 99.6 | 99.8 | 99.8 | 6.9 | 100.0 | 100.0 | 100.0 |
-| SYN-CROSS | 97.3 | 97.3 | 97.3 | 40.1 | 94.8 | 94.8 | 94.8 |
-| SYN-CROSS-DEG | 33.8 | 47.3 | 47.3 | 10.2 | 64.4 | 65.6 | 65.6 |
-| SYN-TWO | 99.1 | 100.0 | 100.0 | 0.0 | nan | nan | nan |
-| SYN-WALK | 99.9 | 100.0 | 100.0 | 0.0 | nan | nan | nan |
+| recording | system | cone | cone_3d_first | competitor_s | system_with_competitor | cone_with_competitor | cone_3d_first_with_competitor | competitor_3d_s | system_with_3d_competitor | cone_with_3d_competitor | cone_3d_first_with_3d_competitor |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| SYN-CAR | 99.6 | 99.8 | 99.8 | 6.9 | 100.0 | 100.0 | 100.0 | 0.0 | nan | nan | nan |
+| SYN-CROSS | 97.3 | 97.3 | 97.3 | 40.1 | 94.8 | 94.8 | 94.8 | 40.1 | 94.8 | 94.8 | 94.8 |
+| SYN-CROSS-DEG | 33.8 | 47.3 | 47.3 | 10.2 | 64.4 | 65.6 | 65.6 | 10.2 | 64.4 | 65.6 | 65.6 |
+| SYN-TWO | 99.1 | 100.0 | 100.0 | 0.0 | nan | nan | nan | 0.0 | nan | nan | nan |
+| SYN-WALK | 99.9 | 100.0 | 100.0 | 0.0 | nan | nan | nan | 0.0 | nan | nan | nan |
 
 
 ## Figures

@@ -144,6 +144,15 @@ def test_competitor_episodes_add_up_to_the_competitor_subset():
         assert abs(al.cone - a.cone_with_competitor) < 1e-9, name
         assert abs(al.cone_3d_first - rb["cone_3d_first_with_competitor"]) < 1e-9, name
         assert (E.gaze_to_competitor_deg <= P["cone_tol_deg"] + 1e-9).all(), name
+        # the 3D rows are the samples with another 3D object within the tolerance
+        d3 = summ[summ.competitor_source == "3D"]
+        if rb["competitor_3d_s"] > 0:
+            r3 = d3.iloc[0]
+            assert abs(r3.samples / rec.rate_hz - rb["competitor_3d_s"]) < 0.051, name
+            assert abs(r3.system - rb["system_with_3d_competitor"]) < 1e-9, name
+            assert abs(r3.cone_3d_first - rb["cone_3d_first_with_3d_competitor"]) < 1e-9, name
+        else:
+            assert d3.empty, name
 
 
 def test_parked_car_is_the_3d_competitor_of_the_crossing():

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- **A competitor's source is 3D whenever another 3D object is within the tolerance**, even if a camera-only candidate is nearer the gaze, and episodes are split where the source changes. The `3D` rows of `competitor_summary.csv` and of the competitor table are then exactly the samples where the 3D-first cone can go wrong.
+- `robust_cone_3d_first.csv` adds the same subset: `competitor_3d_s`, `system_with_3d_competitor`, `cone_with_3d_competitor`, `cone_3d_first_with_3d_competitor`.
+- `goeval.metrics.others_by_source`: the nearest other 3D and camera-only candidate per sample, shared by the 3D-first cone and the competitor episodes.
+- No change to any number in 0.1.1's outputs.
+
 ## 0.1.2
 
 - **Competitor episodes.** New `goeval.metrics.competitor_episodes` and `competitor_summary`, written to `competitor_episodes.csv` and `competitor_summary.csv`, with a section in `report.md`. The competitor table in `tables.md` / `tables.tex` now splits the competitor subset by the competitor's source (3D, camera-only, other target) and adds the 3D-first cone and the centre ray. New setting `episode_gap_s` (0.5 s).

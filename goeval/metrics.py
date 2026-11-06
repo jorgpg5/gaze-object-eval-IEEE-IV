@@ -233,28 +233,38 @@ def car_phases(s, P):
 
 
 # ---------------------------------------------------------------- competitors
-def cone_3d_first_of(lk, info, P):
-    """The 3D-first cone on looking samples lk; its competitors are every candidate
-    except the looked-at target (with two pedestrians, the other one competes)."""
+def others_by_source(lk, info, P):
+    """Per looking sample of lk, the nearest 3D and the nearest camera-only candidate
+    other than the looked-at target (with two pedestrians, the other pedestrian is
+    a candidate): two frames as table.best_other, aligned with lk.index."""
     objs, tg = info["objs"], info["targets"]
-    parts = []
+    o3s, o2s = [], []
     groups = ({"L": lk[lk.looked == "L"], "R": lk[lk.looked == "R"]} if isinstance(tg, dict) else {"T": lk})
     for side, g in groups.items():
         if g.empty:
             continue
         mine = tg[side] if isinstance(tg, dict) else tg
         dups = T.same_as_target(objs, g, P)
-        o3 = T.best_other(objs[objs["repr"] == "3d"], mine, g.index, dups)
-        o2 = T.best_other(objs[objs["repr"] == "2d"], mine, g.index, dups)
-        parts.append(BL.cone_3d_first(g, o3, o2, P["cone_tol_deg"]))
-    return pd.concat(parts).reindex(lk.index) if parts else pd.Series(index=lk.index, dtype=object)
+        o3s.append(T.best_other(objs[objs["repr"] == "3d"], mine, g.index, dups))
+        o2s.append(T.best_other(objs[objs["repr"] == "2d"], mine, g.index, dups))
+    if not o3s:
+        empty = T.best_other(objs.iloc[:0], [], lk.index)
+        return empty, empty
+    return pd.concat(o3s).reindex(lk.index), pd.concat(o2s).reindex(lk.index)
+
+
+def cone_3d_first_of(lk, info, P):
+    """The 3D-first cone on looking samples lk; its competitors are every candidate
+    except the looked-at target (with two pedestrians, the other one competes)."""
+    o3, o2 = others_by_source(lk, info, P)
+    return BL.cone_3d_first(lk, o3, o2, P["cone_tol_deg"])
 
 
 def _box_gap(lk):
-    """Angular gap (deg) between the target's box and the competitor's, as seen from
-    the eye; 0 = the two boxes overlap in view."""
-    gaz = np.maximum(0.0, np.maximum(lk.other_az0 - lk.az1, lk.az0 - lk.other_az1))
-    gel = np.maximum(0.0, np.maximum(lk.other_el0 - lk.el1, lk.el0 - lk.other_el1))
+    """Angular gap (deg) between the target's box and the competitor's (comp_az0 ..
+    comp_el1), as seen from the eye; 0 = the two boxes overlap in view."""
+    gaz = np.maximum(0.0, np.maximum(lk.comp_az0 - lk.az1, lk.az0 - lk.comp_az1))
+    gel = np.maximum(0.0, np.maximum(lk.comp_el0 - lk.el1, lk.el0 - lk.comp_el1))
     return np.hypot(gaz, gel)
 
 
@@ -266,8 +276,13 @@ def _mode(x):
 def competitor_episodes(rec, s, info, P):
     """The competitor subset, split into episodes: looking samples (5-55 m) with
     another candidate within cone_tol_deg of the gaze, grouped by unit (and
-    looked-at pedestrian) and split where samples are more than episode_gap_s apart.
-    Each episode names its main competitor and gives what the system and each
+    looked-at pedestrian) and by the competitor's source, and split where samples
+    are more than episode_gap_s apart.
+
+    A sample's competitor is the nearest other 3D object if one is within the
+    tolerance (source 3D, or other target for the other pedestrian), else the
+    nearest other candidate (camera-only, or the other pedestrian's box). Each
+    episode names its main competitor and gives what the system and each
     reference rule chose."""
     rate = rec.rate_hz
     tol = P["cone_tol_deg"]
@@ -275,21 +290,33 @@ def competitor_episodes(rec, s, info, P):
     lk = lk[lk.band.notna()]
     if lk.empty:
         return pd.DataFrame()
-    c3 = cone_3d_first_of(lk, info, P)
+    o3, o2 = others_by_source(lk, info, P)
+    c3 = BL.cone_3d_first(lk, o3, o2, tol)
     comp = (lk.other_off <= tol).values
-    lk = lk[comp].copy()
+    lk, o3 = lk[comp].copy(), o3[comp]
     if lk.empty:
         return pd.DataFrame()
     lk["c3"], lk["c2"], lk["c0"] = c3[comp], BL.cone(lk, tol), BL.cone(lk, 0.0)
-    lk["source"] = np.where(lk.other_is_target2, "other target",
-                            np.where(lk.other_repr == "3d", "3D", "camera-only"))
-    oid = lk.other_id.astype("Int64").astype(str)
-    lk["comp_key"] = np.where(lk.other_is_target2, "other target", oid + " " + lk.source)
-    lk["box_gap"] = _box_gap(lk)
+    has3 = (o3.other_off <= tol).values
+    tg = info["targets"]
+    if isinstance(tg, dict):
+        other_ids = lk.looked.map({"L": set(tg["R"]), "R": set(tg["L"])})
+        ped3 = np.array([i in ids if pd.notna(i) else False for i, ids in zip(o3.other_id, other_ids)])
+    else:
+        ped3 = np.zeros(len(lk), bool)
+    lk["source"] = np.where(has3, np.where(ped3, "other target", "3D"),
+                            np.where(lk.other_is_target2, "other target", "camera-only"))
+    for c in ["off", "dist", "id", "class"] + T.EXTENT_COLS:
+        lk[f"comp_{c}"] = np.where(has3, o3[f"other_{c}"], lk[f"other_{c}"])
+    lk.loc[lk.source == "other target", "comp_id"] = np.nan
+    oid = pd.to_numeric(lk.comp_id).astype("Int64").astype(str)
+    lk["comp_key"] = np.where(lk.source == "other target", "other target", oid + " " + lk.source)
+    lk["box_gap"] = _box_gap(lk.astype({c: float for c in ["comp_az0", "comp_az1", "comp_el0", "comp_el1"]}))
     two = s.protocol.iloc[0] == "two_pedestrians"
     lk["ep_unit"] = lk.unit + (" " + lk.looked if two else "")
     lk = lk.sort_values("t_s")
-    new = (lk.ep_unit != lk.ep_unit.shift()) | (lk.t_s.diff() > P["episode_gap_s"] + 1e-6)
+    new = ((lk.ep_unit != lk.ep_unit.shift()) | (lk.source != lk.source.shift())
+           | (lk.t_s.diff() > P["episode_gap_s"] + 1e-6))
     lk["episode"] = new.cumsum()
     rows = []
     for _, g in lk.groupby("episode"):
@@ -299,12 +326,12 @@ def competitor_episodes(rec, s, info, P):
             recording=rec.name, condition=rec.condition, unit=g.ep_unit.iloc[0], phase=_mode(g.phase),
             start_s=round(float(g.t_s.min()), 2), samples=len(g), seconds=round(len(g) / rate, 2),
             target_dist_m=round(float(g.band_dist.fillna(g.dist).median()), 1), target_input=_mode(g.input_state),
-            competitor_id=m.other_id.iloc[0], competitor_source=m.source.iloc[0],
-            competitor_class=m.other_class.iloc[0], competitor_share_pct=pct(g.comp_key == key),
-            competitors=g.comp_key.nunique(), competitor_dist_m=round(float(m.other_dist.median()), 1),
+            competitor_id=m.comp_id.iloc[0], competitor_source=m.source.iloc[0],
+            competitor_class=m.comp_class.iloc[0], competitor_share_pct=pct(g.comp_key == key),
+            competitors=g.comp_key.nunique(), competitor_dist_m=round(float(m.comp_dist.astype(float).median()), 1),
             box_gap_deg=round(float(m.box_gap.median()), 2),
             gaze_to_target_deg=round(float(g.off_box.median()), 2),
-            gaze_to_competitor_deg=round(float(g.other_off.median()), 2),
+            gaze_to_competitor_deg=round(float(g.comp_off.astype(float).median()), 2),
             system=pct(g.att == "target"), system_other_object=pct(g.att.isin(["other", "other_target"])),
             system_none=pct(g.att == "none"), cone=pct(g.c2 == "target"),
             cone_3d_first=pct(g.c3 == "target"), centre_ray=pct(g.c0 == "target")))
@@ -374,14 +401,21 @@ def robustness(rec, s, info, P):
                             no_box_pct=100 * (1 - len(with_box) / n_in),
                             beyond_gate_pct=100 * (with_box.looked == "none").sum() / n_in,
                             scored_pct=100 * len(T.looking(s)) / n_in)]
-    # 3D-first cone: competitors = every candidate except the looked-at target
+    # 3D-first cone: competitors = every candidate except the looked-at target;
+    # also on the samples with another 3D object within the tolerance, where it can go wrong
     tol = P["cone_tol_deg"]
-    c3 = cone_3d_first_of(lk, info, P)
+    o3, o2 = others_by_source(lk, info, P)
+    c3 = BL.cone_3d_first(lk, o3, o2, tol)
     c2 = BL.cone(lk, tol)
     comp = lk.other_off <= tol
+    comp3 = o3.other_off <= tol
     out["cone_3d_first"] = [dict(recording=name, system=pct(lk.att == "target"), cone=pct(c2 == "target"),
                                  cone_3d_first=pct(c3 == "target"), competitor_s=_sec(int(comp.sum()), rate),
                                  system_with_competitor=pct(lk.att[comp] == "target"),
                                  cone_with_competitor=pct(c2[comp] == "target"),
-                                 cone_3d_first_with_competitor=pct(c3[comp] == "target"))]
+                                 cone_3d_first_with_competitor=pct(c3[comp] == "target"),
+                                 competitor_3d_s=_sec(int(comp3.sum()), rate),
+                                 system_with_3d_competitor=pct(lk.att[comp3] == "target"),
+                                 cone_with_3d_competitor=pct(c2[comp3] == "target"),
+                                 cone_3d_first_with_3d_competitor=pct(c3[comp3] == "target"))]
     return out
