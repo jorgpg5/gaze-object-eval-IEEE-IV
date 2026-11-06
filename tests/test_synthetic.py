@@ -124,10 +124,44 @@ def test_sweep_matches_table():
         assert np.all(np.diff(sw.sort_values("tol_deg").cone_none.values) <= 1e-9)
 
 
+def test_competitor_episodes_add_up_to_the_competitor_subset():
+    # pooled over episodes, the scores are those of the competitor subset in the
+    # mapping table and in the 3D-first robustness check
+    for name in ("SYN-CROSS", "SYN-CROSS-DEG", "SYN-CAR", "SYN-TWO"):
+        rec, s, info = built(name)
+        E = M.competitor_episodes(rec, s, info, P)
+        a = _main_all(s)
+        rb = M.robustness(rec, s, info, P)["cone_3d_first"][0]
+        lk = M.banded(s, P)
+        n_comp = int((lk[lk.band.notna()].other_off <= P["cone_tol_deg"]).sum())
+        if n_comp == 0:
+            assert E.empty, name
+            continue
+        assert E.samples.sum() == n_comp, name
+        summ = M.competitor_summary(E)
+        al = summ[summ.competitor_source == "all"].iloc[0]
+        assert abs(al.system - a.system_with_competitor) < 1e-9, name
+        assert abs(al.cone - a.cone_with_competitor) < 1e-9, name
+        assert abs(al.cone_3d_first - rb["cone_3d_first_with_competitor"]) < 1e-9, name
+        assert (E.gaze_to_competitor_deg <= P["cone_tol_deg"] + 1e-9).all(), name
+
+
+def test_parked_car_is_the_3d_competitor_of_the_crossing():
+    # SYN-CROSS has one car, parked at x = 25 m on the right: every 3D competitor episode is that car
+    rec, s, info = built("SYN-CROSS")
+    E = M.competitor_episodes(rec, s, info, P)
+    e3 = E[E.competitor_source == "3D"]
+    assert len(e3) and (e3.competitor_class == "car").all()
+    assert e3.competitor_id.nunique() == 1
+    assert ((e3.competitor_dist_m > 23.5) & (e3.competitor_dist_m < 25.5)).all(), e3.competitor_dist_m
+    assert (e3.box_gap_deg >= 0).all() and (e3.box_gap_deg == 0).any()   # overlapping in view at some depths
+
+
 def test_evaluate_writes_everything():
     paths = [synthetic(n)[0] for n in ("SYN-WALK", "SYN-CAR")]
     out = os.path.join(TMP, "eval_out")
     goeval.evaluate(paths, out, log=lambda *a: None)
     for f in ("report.md", "tables.md", "tables.tex", "mapping.csv", "gaze_input.csv", "sweep.csv",
-              "car_phases.csv", "robust_gate.csv", "fig_sweep.png", "fig_distance_SYN-WALK.png"):
+              "car_phases.csv", "competitor_episodes.csv", "competitor_summary.csv", "robust_gate.csv",
+              "fig_sweep.png", "fig_distance_SYN-WALK.png"):
         assert os.path.exists(os.path.join(out, f)), f

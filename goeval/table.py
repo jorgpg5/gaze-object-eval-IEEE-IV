@@ -7,7 +7,9 @@ One row per valid gaze sample inside a unit, with:
               (camera-only) / absent
   off_box     exact angular distance (deg) from the gaze ray to the target's box
               (0 = the ray hits it); err_total = angle to the box centre; dist
-  other_off / other_dist   the best competing candidate (smallest off_box)
+  other_off / other_dist   the best competing candidate (smallest off_box), with
+              other_id, other_repr (3d / 2d), other_class and its angular box
+              other_az0 .. other_el1
   att         what the system attended: target / other_target / other / none
   phase       standing / walking / approach;  unit;  band_dist (for bands)
   clean       not a saccade or blink sample
@@ -28,7 +30,8 @@ from .io import objects_at_samples
 from .signals import sample_table
 
 BOX_COLS = ["obj_x", "obj_y", "obj_z", "obj_sx", "obj_sy", "obj_sz", "obj_yaw_deg"]
-VIEW_COLS = ["off_box", "err_total", "dist", "in3d", "repr", "band_dist", "input_state", "az0", "az1", "el0", "el1"]
+EXTENT_COLS = ["az0", "az1", "el0", "el1"]
+VIEW_COLS = ["off_box", "err_total", "dist", "in3d", "repr", "band_dist", "input_state"] + EXTENT_COLS
 
 
 def _exact(view):
@@ -102,6 +105,10 @@ def best_other(objs, exclude_ids, index, exclude_pairs=frozenset()):
     out["other_off"] = o.off_box.reindex(index).fillna(np.inf)
     out["other_dist"] = o.dist_m.reindex(index).fillna(np.inf)
     out["other_id"] = o.obj_id.reindex(index)
+    out["other_repr"] = o["repr"].reindex(index)
+    out["other_class"] = o.obj_class.reindex(index)
+    for c in EXTENT_COLS:
+        out[f"other_{c}"] = o[c].reindex(index)
     return out
 
 
@@ -272,6 +279,10 @@ def build(rec, params=None):
         s["other_dist"] = np.where(use_ped, other_ped_dist, oth.other_dist)
         s["other_is_target2"] = use_ped
         s["other_id"] = np.where(use_ped, np.nan, oth.other_id)
+        s["other_repr"] = np.where(use_ped, np.where(lookR, vL["repr"], vR["repr"]), oth.other_repr)
+        s["other_class"] = np.where(use_ped, "pedestrian", oth.other_class)
+        for c in EXTENT_COLS:
+            s[f"other_{c}"] = np.where(use_ped, np.where(lookR, vL[c], vR[c]), oth[f"other_{c}"])
         a = s.attended_id
         mine = np.where(lookR, a.isin(ids["R"]), a.isin(ids["L"])) | _att_dup(s, dups)
         theirs = np.where(lookR, a.isin(ids["L"]), a.isin(ids["R"]))

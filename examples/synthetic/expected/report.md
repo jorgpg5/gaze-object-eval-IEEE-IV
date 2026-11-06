@@ -1,6 +1,6 @@
 # Gaze-to-object mapping evaluation
 
-goeval 0.1.1. Settings that differ from the defaults: none.
+goeval 0.1.2. Settings that differ from the defaults: none.
 
 ## Recordings
 
@@ -43,13 +43,13 @@ goeval 0.1.1. Settings that differ from the defaults: none.
 | SYN-TWO | standard | 99 / 100 / 69 | 30.1 | 99 / 100 / 74 | 23.7 |
 | SYN-WALK | standard | 100 / 100 / 53 | 18.1 | 100 / 100 / 54 | 22.7 |
 
-**Samples with another object within 2° of the gaze**: % mapped to the looked-at object.
+**Samples with another candidate within 2° of the gaze** (competitor subset), by the competitor's source: % mapped to the looked-at object. Recordings with less than 1 s are left out.
 
-| Recording | Looking time with a competitor (s) | Share of looking samples (%) | System | Cone |
-|---|---|---|---|---|
-| SYN-CAR | 6.9 | 32 | 100.0 | 100.0 |
-| SYN-CROSS | 40.1 | 53 | 94.8 | 94.8 |
-| SYN-CROSS-DEG | 10.2 | 13 | 64.4 | 65.6 |
+| Recording | Competitor | Episodes | Looking time (s) | Share of looking samples (%) | System | 2° cone | 3D-first cone | Centre ray |
+|---|---|---|---|---|---|---|---|---|
+| SYN-CAR | camera-only | 9 | 6.9 | 32 | 100.0 | 100.0 | 100.0 | 87.5 |
+| SYN-CROSS | 3D | 26 | 40.1 | 53 | 94.8 | 94.8 | 94.8 | 77.0 |
+| SYN-CROSS-DEG | 3D | 21 | 10.2 | 13 | 64.4 | 65.6 | 65.6 | 22.8 |
 
 
 ## Crossings
@@ -76,6 +76,37 @@ goeval 0.1.1. Settings that differ from the defaults: none.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | SYN-CAR | standard | approach 1 | 61.2 | 61.2 | 5.2 | 100.0 | 0.0 | nan | nan | 11.7 | 99.3 |
 | SYN-CAR | standard | approach 2 | 62.6 | 62.6 | 4.8 | 100.0 | 0.0 | nan | nan | 11.7 | 100.0 |
+
+
+## Competitor episodes
+
+Stretches of looking samples with another candidate within the cone tolerance of the gaze, split where samples are more than 0.5 s apart; scores are % of the episode's samples mapped to the looked-at object. Episodes of at least 1 s are listed here, every episode is in `competitor_episodes.csv`, and `competitor_summary.csv` pools them by the competitor's source.
+
+
+| recording | unit | phase | start_s | seconds | target_dist_m | competitor_source | competitor_class | competitor_dist_m | box_gap_deg | gaze_to_target_deg | gaze_to_competitor_deg | system | cone | cone_3d_first | centre_ray |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| SYN-CAR | approach 1 | approach | 11.0 | 2.6 | 34.0 | camera-only | car | 108.5 | 0.7 | 0.0 | 1.7 | 100.0 | 100.0 | 100.0 | 77.7 |
+| SYN-CAR | approach 2 | approach | 38.9 | 1.6 | 35.0 | camera-only | car | 106.9 | 0.7 | 0.0 | 1.8 | 100.0 | 100.0 | 100.0 | 95.1 |
+| SYN-CROSS | 13 m R #1 | standing | 1.7 | 3.6 | 12.3 | 3D | car | 24.4 | 0.0 | 0.0 | 0.2 | 100.0 | 100.0 | 100.0 | 100.0 |
+| SYN-CROSS | walk 13 m R #1 -> 13 m L #1 | walking | 6.0 | 1.2 | 12.2 | 3D | car | 24.4 | 0.0 | 0.0 | 0.2 | 100.0 | 100.0 | 100.0 | 100.0 |
+| SYN-CROSS | walk 13 m L #1 -> 13 m R #2 | walking | 19.4 | 2.1 | 12.2 | 3D | car | 24.4 | 0.0 | 0.0 | 0.2 | 99.0 | 99.0 | 99.0 | 96.2 |
+| SYN-CROSS | 13 m R #2 | standing | 22.3 | 1.2 | 12.3 | 3D | car | 24.4 | 0.0 | 0.0 | 0.1 | 100.0 | 100.0 | 100.0 | 100.0 |
+| SYN-CROSS | walk 13 m R #2 -> 23 m R #1 | walking | 26.6 | 3.6 | 14.7 | 3D | car | 24.4 | 0.0 | 0.0 | 0.2 | 98.9 | 98.9 | 98.9 | 98.3 |
+| SYN-CROSS | walk 13 m R #2 -> 23 m R #1 | walking | 30.7 | 2.9 | 19.9 | 3D | car | 24.4 | 0.0 | 0.0 | 0.0 | 91.2 | 91.2 | 91.2 | 90.5 |
+| SYN-CROSS | walk 13 m R #2 -> 23 m R #1 | walking | 34.2 | 1.0 | 22.1 | 3D | car | 24.4 | 0.0 | 0.0 | 0.0 | 55.8 | 55.8 | 55.8 | 55.8 |
+| SYN-CROSS | 23 m R #1 | standing | 35.3 | 1.9 | 22.2 | 3D | car | 24.4 | 0.0 | 0.0 | 0.0 | 84.0 | 84.0 | 84.0 | 77.7 |
+| SYN-CROSS | 23 m R #1 | standing | 37.7 | 1.6 | 22.2 | 3D | car | 24.4 | 0.0 | 0.0 | 0.0 | 74.4 | 74.4 | 74.4 | 60.3 |
+| SYN-CROSS | walk 23 m R #1 -> 23 m L #1 | walking | 39.3 | 1.1 | 22.1 | 3D | car | 24.3 | 0.0 | 0.0 | 0.5 | 91.2 | 91.2 | 91.2 | 82.5 |
+| SYN-CROSS | 23 m R #2 | standing | 55.8 | 2.8 | 22.2 | 3D | car | 24.4 | 0.0 | 0.0 | 0.0 | 95.0 | 95.0 | 95.0 | 93.5 |
+| SYN-CROSS | walk 23 m R #2 -> 33 m R #1 | walking | 59.8 | 1.4 | 22.3 | 3D | car | 24.4 | 0.0 | 0.0 | 0.1 | 80.9 | 80.9 | 80.9 | 75.0 |
+| SYN-CROSS | walk 23 m R #2 -> 33 m R #1 | walking | 61.7 | 3.8 | 26.6 | 3D | car | 24.4 | 0.7 | 0.0 | 0.9 | 98.4 | 98.4 | 98.4 | 87.8 |
+| SYN-CROSS | walk 23 m R #2 -> 33 m R #1 | walking | 66.0 | 2.3 | 32.1 | 3D | car | 24.4 | 1.7 | 0.1 | 1.6 | 100.0 | 100.0 | 100.0 | 31.3 |
+| SYN-CROSS | 33 m R #1 | standing | 70.1 | 2.6 | 32.1 | 3D | car | 24.4 | 1.8 | 0.2 | 1.6 | 100.0 | 100.0 | 100.0 | 26.6 |
+| SYN-CROSS | walk 33 m L #1 -> 33 m R #2 | walking | 87.9 | 1.0 | 32.1 | 3D | car | 24.4 | 1.8 | 0.3 | 1.7 | 100.0 | 100.0 | 100.0 | 17.3 |
+| SYN-CROSS-DEG | 13 m R #1 | standing | 2.3 | 2.5 | 12.3 | 3D | car | 24.4 | 0.0 | 0.5 | 0.4 | 48.4 | 48.4 | 48.4 | 29.0 |
+| SYN-CROSS-DEG | walk 13 m L #1 -> 13 m R #2 | walking | 19.9 | 1.3 | 12.3 | 3D | car | 24.3 | 0.0 | 0.4 | 1.1 | 55.2 | 55.2 | 55.2 | 31.3 |
+| SYN-CROSS-DEG | 13 m R #2 | standing | 25.1 | 1.2 | 12.3 | 3D | car | 24.4 | 0.0 | 0.5 | 0.2 | 50.8 | 50.8 | 50.8 | 13.6 |
+| SYN-CROSS-DEG | walk 13 m R #2 -> 23 m R #1 | walking | 32.1 | 1.1 | 21.3 | 3D | car | 24.4 | 0.0 | 0.6 | 1.4 | 96.2 | 100.0 | 100.0 | 24.5 |
 
 
 ## Robustness

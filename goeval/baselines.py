@@ -5,15 +5,20 @@ cone(s, tol)         nearest box to the gaze ray (exact angular distance), accep
                      nearer object. cone(s, 0) = the centre ray: the gaze ray hits a box.
 cone_3d_first(...)   the same rule over 3D candidates first; camera-only candidates
                      only when no 3D box is within tol.
+
+Both rules accept a candidate at distance <= tol + EPS, so that a gaze ray that just
+touches a box edge counts as a hit despite rounding.
 """
 import numpy as np
 import pandas as pd
+
+EPS = 1e-9  # deg
 
 
 def cone(s, tol):
     tgt_first = (s.off_box < s.other_off) | ((s.off_box == s.other_off) & (s.dist <= s.other_dist))
     best_off = np.where(tgt_first, s.off_box, s.other_off)
-    hit = best_off <= tol + 1e-9
+    hit = best_off <= tol + EPS
     other_label = np.where(s.other_is_target2, "other_target", "other")
     return pd.Series(np.where(hit & tgt_first, "target", np.where(hit, other_label, "none")), index=s.index)
 
@@ -27,11 +32,11 @@ def cone_3d_first(lk, o3, o2, tol):
     d_t, d_o = lk.dist.values, o3.other_dist.reindex(lk.index).fillna(np.inf).values
     pick_t = (c_t < c_o) | ((c_t == c_o) & (d_t <= d_o))
     best = np.where(pick_t, c_t, c_o)
-    out = np.where(best <= tol, np.where(pick_t, "target", "other"), "")
+    out = np.where(best <= tol + EPS, np.where(pick_t, "target", "other"), "")
     c_t2 = np.where(~t3, toff, np.inf)
     c_o2 = o2.other_off.reindex(lk.index).fillna(np.inf).values
     d_o2 = o2.other_dist.reindex(lk.index).fillna(np.inf).values
     pick_t2 = (c_t2 < c_o2) | ((c_t2 == c_o2) & (d_t <= d_o2))
     best2 = np.where(pick_t2, c_t2, c_o2)
-    out2 = np.where(best2 <= tol, np.where(pick_t2, "target", "other"), "none")
+    out2 = np.where(best2 <= tol + EPS, np.where(pick_t2, "target", "other"), "none")
     return pd.Series(np.where(out == "", out2, out), index=lk.index)

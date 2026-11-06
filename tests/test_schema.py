@@ -50,9 +50,11 @@ def test_repeated_id_in_one_list_is_an_error():
 
 def test_unknown_protocol_is_an_error():
     d = _copy("SYN-WALK", "bad-protocol")
-    m = json.load(open(os.path.join(d, "recording.json")))
+    with open(os.path.join(d, "recording.json"), encoding="utf-8") as f:
+        m = json.load(f)
     m["protocol"] = "slalom"
-    json.dump(m, open(os.path.join(d, "recording.json"), "w"))
+    with open(os.path.join(d, "recording.json"), "w", encoding="utf-8") as f:
+        json.dump(m, f)
     assert any("protocol" in e for e in _errors(d))
     try:
         goeval.read_recording(d)

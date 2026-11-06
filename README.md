@@ -8,7 +8,7 @@ Verifying such a system on the road is hard because the object the driver looked
 |---|---|---|
 | Gaze input | How far is the gaze estimate from the cued target? | yaw bias and yaw / pitch precision per stop |
 | Object input | How did the target reach the mapping: as a 3D box, camera-only, or not at all? | share of looking time per input state |
-| Mapping | Given that gaze and those objects, did the system map the gaze to the right object? | % mapped by distance band, against a nearest-box cone and a centre-ray baseline scored on the same samples and candidates |
+| Mapping | Given that gaze and those objects, did the system map the gaze to the right object? | % mapped by distance band, against two reference rules scored on the same samples and candidates: a 2° cone (a nearest-box rule) and the centre ray |
 
 It is **black-box**. The only thing it needs from the system under test is the ID of the object the system maps each gaze sample to, logged next to the gaze and object lists the system used. No internals, settings or source code of the system are needed.
 
@@ -25,7 +25,7 @@ Then open `out/report.md`. The synthetic recordings have a known gaze bias and n
 
 ## Evaluating your system
 
-1. **Record the protocols** in `docs/protocol.md`: walk-away, crossing, two pedestrians and an approaching car. Calibrate the gaze for each driver before each session.
+1. **Record the protocols** in `docs/protocol.md`: walk-away, crossing, two pedestrians and an approaching car. Calibrate the gaze for each driver before each session (or, if you fit offsets afterwards, fit them on data you do not score; see `docs/protocol.md`).
 2. **Log three files per recording** as described in `docs/schema.md`:
    - `gaze.csv`: gaze samples, with your system's `attended_id`;
    - `objects.csv`: the 3D and camera-only object lists your system mapped against;
@@ -39,11 +39,12 @@ Every setting (look gate, distance bands, cone tolerance, segmentation threshold
 
 `OUT/report.md` collects everything below, together with the figures (`fig_distance_<recording>.png`, `fig_sweep.png`):
 
-- `tables.md` / `tables.tex`: the gaze input table, the mapping table by distance, standing vs walking, and the samples where another object is within the cone tolerance.
+- `tables.md` / `tables.tex`: the gaze input table, the mapping table by distance, standing vs walking, and the competitor table (samples where another object is within the cone tolerance, by the competitor's source).
 - `mapping.csv`: the long form of the mapping table (every phase and band, input states, competitor columns).
 - `gaze_input*.csv`, `sweep*.csv`, `offbox.csv`: per-unit gaze errors, the cone tolerance sweep, and the distribution of gaze-to-box distances.
 - `crossing_*.csv`: the pedestrian walking across the lane (per crossing, by depth and direction, along-track gaze error).
 - `car_phases.csv`: the approaching car (camera-only lead-in, in 3D but not yet mapped, mapped).
+- `competitor_episodes.csv`, `competitor_summary.csv`: the samples where another object is within the cone tolerance of the gaze, split into episodes, each with its main competitor (source, class, distance, angular gap to the target) and what the system, the 2° cone, the 3D-first cone and the centre ray chose.
 - `robust_*.csv`: robustness checks (look gate, saccades kept, unscored time, a 3D-first cone).
 - `samples.pkl`: the per-sample tables, for your own analyses.
 
@@ -60,7 +61,7 @@ examples/      synthetic recordings with known answers, the generator, and the e
 tests/         geometry, schema and end-to-end tests (python3 tests/run_tests.py, or pytest)
 ```
 
-Tested with Python 3.13, numpy 2.5, pandas 3.0 and matplotlib 3.11.
+Tested with Python 3.13, numpy 2.5, pandas 3.0 and matplotlib 3.11 (the minimums in `requirements.txt`). Older versions may work but are untested.
 
 ## Scope and assumptions
 

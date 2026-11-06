@@ -48,7 +48,7 @@ On looking samples within the distance bands `bands_m` (5–55 m in 10 m bands),
 | Mapping | Rule |
 |---|---|
 | **system** | `attended_id` is the target (or its camera-only duplicate) |
-| **cone** (`cone_tol_deg`, default 2°) | the candidate with the smallest angular distance from the gaze ray to its box, if within the tolerance. Ties (the ray inside both boxes) go to the nearer object |
+| **2° cone**, a nearest-box rule (`cone_tol_deg`, default 2°) | the candidate with the smallest angular distance from the gaze ray to its box, if within the tolerance. Ties (the ray inside both boxes) go to the nearer object |
 | **centre ray** | the cone with 0° tolerance: the gaze ray must hit the box |
 
 All three are scored on the same samples. The baselines see the same candidates as the system: every 3D object, and every camera-only detection as a box at its estimated depth. The angular distance is exact (`frames.md`).
@@ -65,6 +65,15 @@ All three are scored on the same samples. The baselines see the same candidates 
 Cells with less than `min_cell_s` (3 s) of looking time are not reported.
 
 **Competitor subset:** looking samples where another candidate (not the target) is within the cone tolerance of the gaze. These are the samples where the mapping has a real choice to make. Away from them, a nearest-box rule scores whatever the gaze error allows.
+
+**Competitor episodes** (`competitor_episodes.csv`): the competitor subset split into episodes. Samples of one unit (and, with two pedestrians, one looked-at pedestrian) belong to one episode unless more than `episode_gap_s` (0.5 s) apart. Each episode gives:
+- its time, duration, the target's distance and input state;
+- its **main competitor** (the candidate nearest the gaze in most of its samples): ID, source (`3D`, `camera-only`, or `other target` for the other pedestrian), class and distance, and how many different competitors the episode had;
+- **box gap**: the angular gap between the target's box and the competitor's as seen from the eye (0 = they overlap in view, e.g. a car parked behind a pedestrian);
+- the median angular distance from the gaze to the target's box and to the competitor's;
+- the % of its samples mapped to the target by the system, the 2° cone, the 3D-first cone (Robustness) and the centre ray, and how often the system chose another object or none.
+
+`competitor_summary.csv` pools the episodes per recording and by the competitor's source, weighting by samples. Pooled over all sources, its scores equal the competitor columns of the mapping table. Because the cue fixes the looked-at object, these are the samples where the ground truth comes from the protocol and the gaze alone could not decide.
 
 **Tolerance sweep:** the cone's score from 0° to `sweep_max_deg`, with the system's score for reference. Where nothing else is near the gaze, the cone's curve is the distribution of the gaze-to-box distance: it measures the gaze input, not the mapping.
 

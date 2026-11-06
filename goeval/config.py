@@ -62,6 +62,7 @@ DEFAULTS = dict(
     walk_min_lat_speed_m_s=0.5,   # crossing: lateral speed above which the pedestrian is walking ...
     lat_speed_bin_s=0.25,       # ... measured between bins of this length ...
     lat_speed_smooth_bins=3,    # ... after a median over this many bins
+    episode_gap_s=0.5,          # competitor episodes: competitor samples of one unit closer than this are one episode
     gate_sensitivity_deg=[5.0, 10.0, 15.0],   # robustness: the results with these look gates
     car_bin_m=4.0,              # car approach figure: distance bins
     fig_min_s=1.0,              # figures: a plotted value needs at least this much looking time

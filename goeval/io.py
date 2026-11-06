@@ -73,11 +73,16 @@ def _read(path, fname, **kw):
     return pd.read_csv(p, low_memory=False, **kw)
 
 
+def _read_meta(path):
+    with open(os.path.join(path, "recording.json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
 def check_recording(path):
     """All problems found in a recording folder: list of (level, message), level = error / warning / info."""
     out = []
     try:
-        meta = json.load(open(os.path.join(path, "recording.json")))
+        meta = _read_meta(path)
     except FileNotFoundError:
         return [("error", "missing recording.json")]
     except json.JSONDecodeError as e:
@@ -162,7 +167,7 @@ def read_recording(path):
     errors = [m for lvl, m in problems if lvl == "error"]
     if errors:
         raise SchemaError(f"{path}:\n  " + "\n  ".join(errors))
-    meta = json.load(open(os.path.join(path, "recording.json")))
+    meta = _read_meta(path)
     g = _read(path, "gaze.csv").sort_values("t_s").reset_index(drop=True)
     o = _read(path, "objects.csv", dtype={"class": str, "source": str})
     o["class"] = o["class"].fillna("unknown")

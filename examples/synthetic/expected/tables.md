@@ -26,10 +26,10 @@
 | SYN-TWO | standard | 99 / 100 / 69 | 30.1 | 99 / 100 / 74 | 23.7 |
 | SYN-WALK | standard | 100 / 100 / 53 | 18.1 | 100 / 100 / 54 | 22.7 |
 
-**Samples with another object within 2° of the gaze**: % mapped to the looked-at object.
+**Samples with another candidate within 2° of the gaze** (competitor subset), by the competitor's source: % mapped to the looked-at object. Recordings with less than 1 s are left out.
 
-| Recording | Looking time with a competitor (s) | Share of looking samples (%) | System | Cone |
-|---|---|---|---|---|
-| SYN-CAR | 6.9 | 32 | 100.0 | 100.0 |
-| SYN-CROSS | 40.1 | 53 | 94.8 | 94.8 |
-| SYN-CROSS-DEG | 10.2 | 13 | 64.4 | 65.6 |
+| Recording | Competitor | Episodes | Looking time (s) | Share of looking samples (%) | System | 2° cone | 3D-first cone | Centre ray |
+|---|---|---|---|---|---|---|---|---|
+| SYN-CAR | camera-only | 9 | 6.9 | 32 | 100.0 | 100.0 | 100.0 | 87.5 |
+| SYN-CROSS | 3D | 26 | 40.1 | 53 | 94.8 | 94.8 | 94.8 | 77.0 |
+| SYN-CROSS-DEG | 3D | 21 | 10.2 | 13 | 64.4 | 65.6 | 65.6 | 22.8 |

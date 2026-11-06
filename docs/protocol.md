@@ -2,7 +2,7 @@
 
 The vehicle is stationary and the driver sits in the driver's seat. Pedestrians and a car stand or move at known positions, and the driver is told which one to look at. Because the cue fixes the looked-at object, the evaluation needs no annotation of where the driver looked.
 
-Before each session, calibrate the gaze for the driver as your DMS requires. Then record each protocol as a separate recording, for each driver and each input condition (e.g. `standard`, and a `degraded` condition such as eyeglasses that reduce the DMS's accuracy).
+Before each session, calibrate the gaze for the driver as your DMS requires. If you fit per-driver offsets after recording instead, fit them on data that is not scored (a separate calibration segment, or leaving out the stop being scored), and say so when you report the gaze input: offsets fitted on the scored stops make the bias look smaller than a calibration done beforehand would. Then record each protocol as a separate recording, for each driver and each input condition (e.g. `standard`, and a `degraded` condition such as eyeglasses that reduce the DMS's accuracy).
 
 ## The four protocols
 

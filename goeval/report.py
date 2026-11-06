@@ -12,6 +12,11 @@ from .config import params as _params
 from .io import read_recording
 
 
+def _write(path, text):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+
 def _f0(x):
     return "" if pd.isna(x) else f"{x:.0f}"
 
@@ -22,7 +27,8 @@ def evaluate(paths, out, params=None, figures=True, robustness=True, log=print):
     os.makedirs(out, exist_ok=True)
     R = {k: [] for k in ("gaze_input_units", "gaze_input", "mapping", "mapping_units", "sweep",
                          "sweep_by_band", "offbox", "crossing_per_crossing", "crossing_summary", "car_phases",
-                         "robust_gate", "robust_saccades", "robust_unscored", "robust_cone_3d_first", "recordings")}
+                         "competitor_episodes", "robust_gate", "robust_saccades", "robust_unscored",
+                         "robust_cone_3d_first", "recordings")}
     tables = {}
     for path in paths:
         rec = read_recording(path)
@@ -43,6 +49,7 @@ def evaluate(paths, out, params=None, figures=True, robustness=True, log=print):
         R["offbox"].append(pd.DataFrame([dist]))
         R["mapping"].append(M.mapping_scores(s, P))
         R["mapping_units"].append(M.per_unit(s, P))
+        R["competitor_episodes"].append(M.competitor_episodes(rec, s, info, P))
         if rec.protocol == "crossing":
             c, cr = M.crossing_table(rec, s, info, P)
             if c is not None and len(cr):
@@ -64,18 +71,19 @@ def evaluate(paths, out, params=None, figures=True, robustness=True, log=print):
              if any(x is not None and len(x) for x in v) else pd.DataFrame())
          for k, v in R.items() if k != "recordings"}
     D["recordings"] = pd.DataFrame(R["recordings"])
+    D["competitor_summary"] = M.competitor_summary(D["competitor_episodes"])
     for k, d in D.items():
         if len(d):
             d.to_csv(os.path.join(out, f"{k}.csv"), index=False)
     pd.to_pickle(tables, os.path.join(out, "samples.pkl"))
     md, tex = paper_tables(D, P)
-    open(os.path.join(out, "tables.md"), "w").write(md)
-    open(os.path.join(out, "tables.tex"), "w").write(tex)
+    _write(os.path.join(out, "tables.md"), md)
+    _write(os.path.join(out, "tables.tex"), tex)
     figs = []
     if figures:
         from . import figures as F
         figs = F.all_figures(tables, D, P, out)
-    open(os.path.join(out, "report.md"), "w").write(report_md(D, P, md, figs))
+    _write(os.path.join(out, "report.md"), report_md(D, P, md, figs))
     log(f"written to {out}")
     return D
 
@@ -134,18 +142,28 @@ def paper_tables(D, P):
         st, wk = g.loc["standing"], g.loc["walking"]
         md.append(f"| {rec} | {st.condition} | {_f0(st.system)} / {_f0(st.cone)} / {_f0(st.centre_ray)} | {st.seconds:.1f} | "
                   f"{_f0(wk.system)} / {_f0(wk.cone)} / {_f0(wk.centre_ray)} | {wk.seconds:.1f} |")
-    md.append(f"\n**Samples with another object within {tol:g}° of the gaze**: % mapped to the looked-at object.\n")
-    md.append("| Recording | Looking time with a competitor (s) | Share of looking samples (%) | System | Cone |")
-    md.append("|---|---|---|---|---|")
+    cs = D.get("competitor_summary", pd.DataFrame())
+    md.append(f"\n**Samples with another candidate within {tol:g}° of the gaze** (competitor subset), "
+              f"by the competitor's source: % mapped to the looked-at object. Recordings with less than 1 s are left out.\n")
+    md.append(f"| Recording | Competitor | Episodes | Looking time (s) | Share of looking samples (%) | System | "
+              f"{tol:g}° cone | 3D-first cone | Centre ray |")
+    md.append("|---|---|---|---|---|---|---|---|---|")
+    tex.append("% Competitor table\n\\begin{tabular}{llrrrrrrr}\n\\toprule\nRec. & Competitor & Ep. & s & \\% & "
+               "Sys. & Cone & 3D-first & Ray \\\\\n\\midrule")
     for rec in order:
         a = main[(main.recording == rec) & (main.band == "all")]
-        if a.empty:
+        q = cs[cs.recording == rec] if len(cs) else cs
+        if a.empty or q.empty or q.iloc[0].seconds < 1.0:
             continue
-        a = a.iloc[0]
-        s = a.seconds * a.competitor_pct / 100
-        if s < 1.0:
-            continue
-        md.append(f"| {rec} | {s:.1f} | {a.competitor_pct:.0f} | {a.system_with_competitor:.1f} | {a.cone_with_competitor:.1f} |")
+        look_s = a.iloc[0].seconds
+        if len(q) == 2:                     # a single source: its row is the same as "all"
+            q = q.iloc[1:]
+        for _, r in q.iterrows():
+            share = 100 * r.seconds / look_s if look_s else np.nan
+            cells = [f"{r.system:.1f}", f"{r.cone:.1f}", f"{r.cone_3d_first:.1f}", f"{r.centre_ray:.1f}"]
+            md.append(f"| {rec} | {r.competitor_source} | {r.episodes} | {r.seconds:.1f} | {share:.0f} | " + " | ".join(cells) + " |")
+            tex.append(f"{rec} & {r.competitor_source} & {r.episodes} & {r.seconds:.1f} & {share:.0f} & " + " & ".join(cells) + " \\\\")
+    tex.append("\\bottomrule\n\\end{tabular}\n")
     return "\n".join(md) + "\n", "\n".join(tex) + "\n"
 
 
@@ -167,6 +185,17 @@ def report_md(D, P, tables_md, figs):
         r += ["\n## Crossings\n", _mdtable(D["crossing_summary"])]
     if len(D.get("car_phases", [])):
         r += ["\n## Car approach phases\n", _mdtable(D["car_phases"])]
+    E = D.get("competitor_episodes", pd.DataFrame())
+    if len(E):
+        cols = ["recording", "unit", "phase", "start_s", "seconds", "target_dist_m", "competitor_source",
+                "competitor_class", "competitor_dist_m", "box_gap_deg", "gaze_to_target_deg", "gaze_to_competitor_deg",
+                "system", "cone", "cone_3d_first", "centre_ray"]
+        r += ["\n## Competitor episodes\n",
+              "Stretches of looking samples with another candidate within the cone tolerance of the gaze, "
+              f"split where samples are more than {P['episode_gap_s']:g} s apart; scores are % of the episode's "
+              "samples mapped to the looked-at object. Episodes of at least 1 s are listed here, every episode is in "
+              "`competitor_episodes.csv`, and `competitor_summary.csv` pools them by the competitor's source.\n\n",
+              _mdtable(E[E.seconds >= 1.0], cols)]
     if len(D.get("robust_gate", [])):
         r += ["\n## Robustness\n", "Look gate:\n\n", _mdtable(D["robust_gate"]),
               "\nSaccades kept (blinks still removed):\n\n", _mdtable(D["robust_saccades"]),

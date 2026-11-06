@@ -304,7 +304,8 @@ def write(out, g, objects, meta):
     g[["t_s", "valid", "eye_x", "eye_y", "eye_z", "gaze_yaw_deg", "gaze_pitch_deg", "attended_id", "blink_count"]].to_csv(
         os.path.join(d, "gaze.csv"), index=False, float_format="%.6f")
     objects.to_csv(os.path.join(d, "objects.csv"), index=False, float_format="%.4f")
-    json.dump(meta, open(os.path.join(d, "recording.json"), "w"), indent=2)
+    with open(os.path.join(d, "recording.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
     return d
 
 

@@ -9,6 +9,8 @@ sweep           the cone's score against its tolerance
 crossings       the target walking across the lane: mapping and along-track error
 car_phases      the approaching car: camera-only lead-in, in 3D beyond the range
                 where the system attends it, in 3D within it
+competitors     the competitor subset (another candidate within the cone
+                tolerance) split into episodes, with what each rule chose
 robustness      look gate, saccades kept, a 3D-first cone
 """
 import numpy as np
@@ -230,6 +232,107 @@ def car_phases(s, P):
     return pd.DataFrame(rows)
 
 
+# ---------------------------------------------------------------- competitors
+def cone_3d_first_of(lk, info, P):
+    """The 3D-first cone on looking samples lk; its competitors are every candidate
+    except the looked-at target (with two pedestrians, the other one competes)."""
+    objs, tg = info["objs"], info["targets"]
+    parts = []
+    groups = ({"L": lk[lk.looked == "L"], "R": lk[lk.looked == "R"]} if isinstance(tg, dict) else {"T": lk})
+    for side, g in groups.items():
+        if g.empty:
+            continue
+        mine = tg[side] if isinstance(tg, dict) else tg
+        dups = T.same_as_target(objs, g, P)
+        o3 = T.best_other(objs[objs["repr"] == "3d"], mine, g.index, dups)
+        o2 = T.best_other(objs[objs["repr"] == "2d"], mine, g.index, dups)
+        parts.append(BL.cone_3d_first(g, o3, o2, P["cone_tol_deg"]))
+    return pd.concat(parts).reindex(lk.index) if parts else pd.Series(index=lk.index, dtype=object)
+
+
+def _box_gap(lk):
+    """Angular gap (deg) between the target's box and the competitor's, as seen from
+    the eye; 0 = the two boxes overlap in view."""
+    gaz = np.maximum(0.0, np.maximum(lk.other_az0 - lk.az1, lk.az0 - lk.other_az1))
+    gel = np.maximum(0.0, np.maximum(lk.other_el0 - lk.el1, lk.el0 - lk.other_el1))
+    return np.hypot(gaz, gel)
+
+
+def _mode(x):
+    m = x.dropna().mode()
+    return m.iloc[0] if len(m) else np.nan
+
+
+def competitor_episodes(rec, s, info, P):
+    """The competitor subset, split into episodes: looking samples (5-55 m) with
+    another candidate within cone_tol_deg of the gaze, grouped by unit (and
+    looked-at pedestrian) and split where samples are more than episode_gap_s apart.
+    Each episode names its main competitor and gives what the system and each
+    reference rule chose."""
+    rate = rec.rate_hz
+    tol = P["cone_tol_deg"]
+    lk = banded(s, P)
+    lk = lk[lk.band.notna()]
+    if lk.empty:
+        return pd.DataFrame()
+    c3 = cone_3d_first_of(lk, info, P)
+    comp = (lk.other_off <= tol).values
+    lk = lk[comp].copy()
+    if lk.empty:
+        return pd.DataFrame()
+    lk["c3"], lk["c2"], lk["c0"] = c3[comp], BL.cone(lk, tol), BL.cone(lk, 0.0)
+    lk["source"] = np.where(lk.other_is_target2, "other target",
+                            np.where(lk.other_repr == "3d", "3D", "camera-only"))
+    oid = lk.other_id.astype("Int64").astype(str)
+    lk["comp_key"] = np.where(lk.other_is_target2, "other target", oid + " " + lk.source)
+    lk["box_gap"] = _box_gap(lk)
+    two = s.protocol.iloc[0] == "two_pedestrians"
+    lk["ep_unit"] = lk.unit + (" " + lk.looked if two else "")
+    lk = lk.sort_values("t_s")
+    new = (lk.ep_unit != lk.ep_unit.shift()) | (lk.t_s.diff() > P["episode_gap_s"] + 1e-6)
+    lk["episode"] = new.cumsum()
+    rows = []
+    for _, g in lk.groupby("episode"):
+        key = g.comp_key.value_counts().index[0]
+        m = g[g.comp_key == key]
+        rows.append(dict(
+            recording=rec.name, condition=rec.condition, unit=g.ep_unit.iloc[0], phase=_mode(g.phase),
+            start_s=round(float(g.t_s.min()), 2), samples=len(g), seconds=round(len(g) / rate, 2),
+            target_dist_m=round(float(g.band_dist.fillna(g.dist).median()), 1), target_input=_mode(g.input_state),
+            competitor_id=m.other_id.iloc[0], competitor_source=m.source.iloc[0],
+            competitor_class=m.other_class.iloc[0], competitor_share_pct=pct(g.comp_key == key),
+            competitors=g.comp_key.nunique(), competitor_dist_m=round(float(m.other_dist.median()), 1),
+            box_gap_deg=round(float(m.box_gap.median()), 2),
+            gaze_to_target_deg=round(float(g.off_box.median()), 2),
+            gaze_to_competitor_deg=round(float(g.other_off.median()), 2),
+            system=pct(g.att == "target"), system_other_object=pct(g.att.isin(["other", "other_target"])),
+            system_none=pct(g.att == "none"), cone=pct(g.c2 == "target"),
+            cone_3d_first=pct(g.c3 == "target"), centre_ray=pct(g.c0 == "target")))
+    return pd.DataFrame(rows)
+
+
+EPISODE_SCORES = ["system", "cone", "cone_3d_first", "centre_ray", "system_other_object", "system_none"]
+
+
+def competitor_summary(E):
+    """Per recording: all competitor samples, then by the competitor's source
+    (3D, camera-only, other target); scores weighted by samples."""
+    if E is None or not len(E):
+        return pd.DataFrame()
+    rows = []
+    for (rec, cond), g in E.groupby(["recording", "condition"], sort=False):
+        parts = [("all", g)] + [(src, q) for src, q in g.groupby("competitor_source")]
+        for src, q in parts:
+            w = q.samples.values
+            row = dict(recording=rec, condition=cond, competitor_source=src, episodes=len(q),
+                       samples=int(w.sum()), seconds=round(float(q.seconds.sum()), 2),
+                       episodes_over_1s=int((q.seconds >= 1.0).sum()))
+            for c in EPISODE_SCORES:
+                row[c] = float(np.average(q[c].values, weights=w))
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------------- robustness
 def robustness(rec, s, info, P):
     """Does the result hinge on the analysis choices? Look gate, saccades kept,
@@ -272,20 +375,8 @@ def robustness(rec, s, info, P):
                             beyond_gate_pct=100 * (with_box.looked == "none").sum() / n_in,
                             scored_pct=100 * len(T.looking(s)) / n_in)]
     # 3D-first cone: competitors = every candidate except the looked-at target
-    objs = info["objs"]
-    tg = info["targets"]
     tol = P["cone_tol_deg"]
-    parts = []
-    groups = ({"L": lk[lk.looked == "L"], "R": lk[lk.looked == "R"]} if isinstance(tg, dict) else {"T": lk})
-    for side, g in groups.items():
-        if g.empty:
-            continue
-        mine = tg[side] if isinstance(tg, dict) else tg
-        dups = T.same_as_target(objs, g, P)
-        o3 = T.best_other(objs[objs["repr"] == "3d"], mine, g.index, dups)
-        o2 = T.best_other(objs[objs["repr"] == "2d"], mine, g.index, dups)
-        parts.append(BL.cone_3d_first(g, o3, o2, tol))
-    c3 = pd.concat(parts).reindex(lk.index) if parts else pd.Series(dtype=object)
+    c3 = cone_3d_first_of(lk, info, P)
     c2 = BL.cone(lk, tol)
     comp = lk.other_off <= tol
     out["cone_3d_first"] = [dict(recording=name, system=pct(lk.att == "target"), cone=pct(c2 == "target"),

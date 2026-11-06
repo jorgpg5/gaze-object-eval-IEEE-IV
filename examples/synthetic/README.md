@@ -22,5 +22,6 @@ Each recording also contains:
 - **Degraded input lowers every mapping alike.** The 2° cone scores above the stand-in's 1.5° rule only because it accepts more gaze error.
 - **The crossing's along-track error carries the yaw bias,** +b one way and −b the other, plus a small lead from the 10 Hz object lists.
 - **The car is mapped from where it enters 3D.** Before that, the system attends its camera-only detection.
+- **The competitor episodes of SYN-CROSS all name the parked car** (3D, about 24 m away), overlapping the pedestrian in view (box gap 0°) at 13 and 23 m. The stand-in is itself a nearest-box rule, so it scores the same as the 3D-first cone there.
 
 Regenerate with `python3 generate.py` (fixed seeds, so the output is identical).
