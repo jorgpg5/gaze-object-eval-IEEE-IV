@@ -75,4 +75,4 @@ The paper describing the framework is under review. Citation details will be add
 
 ## Licence
 
-To be confirmed. The code is shared here for peer review.
+MIT. The code is shared here for peer review.
